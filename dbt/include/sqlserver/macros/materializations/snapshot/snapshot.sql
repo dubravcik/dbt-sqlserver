@@ -7,11 +7,11 @@
     from (
 
         select *,
-            COALESCE({{ strategy.scd_id }}, NULL) as dbt_scd_id,
             COALESCE({{ strategy.unique_key }}, NULL) as dbt_unique_key,
             COALESCE({{ strategy.updated_at }}, NULL) as dbt_updated_at,
             COALESCE({{ strategy.updated_at }}, NULL) as dbt_valid_from,
-            nullif({{ strategy.updated_at }}, {{ strategy.updated_at }}) as dbt_valid_to
+            nullif({{ strategy.updated_at }}, {{ strategy.updated_at }}) as dbt_valid_to,
+            COALESCE({{ strategy.scd_id }}, NULL) as dbt_scd_id
 
         from (
         {{ source_sql }}
@@ -41,14 +41,14 @@
 
     select
         'update' as dbt_change_type,
-        snapshotted_data.dbt_scd_id,
-        source_data.dbt_valid_from as dbt_valid_to
+		source_data.*,
+        source_data.dbt_valid_from as dbt_valid_to,
+		snapshotted_data.dbt_scd_id
 
     from (
 
     select
         *,
-        COALESCE({{ strategy.scd_id }}, NULL) as dbt_scd_id,
         COALESCE({{ strategy.unique_key }}, NULL) as dbt_unique_key,
         COALESCE({{ strategy.updated_at }}, NULL) as dbt_updated_at,
         COALESCE({{ strategy.updated_at }}, NULL) as dbt_valid_from
@@ -84,8 +84,8 @@
     {% endcall %}
 
     {% call statement('build_snapshot_staging_relation_updates') %}
-        insert into {{ tmp_relation }} (dbt_change_type, dbt_scd_id, dbt_valid_to)
-        select dbt_change_type, dbt_scd_id, dbt_valid_to from (
+        insert into {{ tmp_relation }} 
+        select * from (
             {{ updates_select }}
         ) dbt_sbq;
     {% endcall %}
@@ -165,7 +165,6 @@
                 insert_cols = quoted_source_columns
              )
           }}
-          {{ drop_relation(staging_table) }}
       {% endcall %}
 
   {% endif %}
