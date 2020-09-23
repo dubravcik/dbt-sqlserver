@@ -133,7 +133,7 @@
           (select
               ordinal_position,
               column_name,
-			  CASE WHEN DATA_TYPE like '%varchar' THEN DATA_TYPE + '('+cast(CHARACTER_MAXIMUM_LENGTH as nvarchar(10))+')' ELSE DATA_TYPE END as data_type,              
+			  CASE WHEN DATA_TYPE like '%varchar' THEN DATA_TYPE + '('+CAST(ISNULL(NULLIF(CHARACTER_MAXIMUM_LENGTH,-1),8000) as nvarchar(10))+')' ELSE DATA_TYPE END 
               character_maximum_length,
               numeric_precision,
               numeric_scale
@@ -144,7 +144,7 @@
           select
               ordinal_position,
               column_name,
-			  CASE WHEN DATA_TYPE like '%varchar' THEN DATA_TYPE + '('+cast(CHARACTER_MAXIMUM_LENGTH as nvarchar(10))+')' ELSE DATA_TYPE END as data_type,
+			  CASE WHEN DATA_TYPE like '%varchar' THEN DATA_TYPE + '('+CAST(ISNULL(NULLIF(CHARACTER_MAXIMUM_LENGTH,-1),8000) as nvarchar(10))+')' ELSE DATA_TYPE END 
               character_maximum_length,
               numeric_precision,
               numeric_scale
