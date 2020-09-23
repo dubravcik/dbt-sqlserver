@@ -141,17 +141,6 @@
           where table_name = '{{ relation.identifier }}'
             and table_schema = '{{ relation.schema }}'
           UNION ALL
-		  select
-              ordinal_position,
-              column_name,
-              data_type,
-              character_maximum_length,
-              numeric_precision,
-              numeric_scale
-          from dw_stg.INFORMATION_SCHEMA.COLUMNS
-          where table_name = '{{ relation.identifier }}'
-            and table_schema = '{{ relation.schema }}'
-			UNION ALL
           select
               ordinal_position,
               column_name,
