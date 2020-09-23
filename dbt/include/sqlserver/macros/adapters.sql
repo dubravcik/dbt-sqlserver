@@ -137,7 +137,7 @@
               character_maximum_length,
               numeric_precision,
               numeric_scale
-          from INFORMATION_SCHEMA.COLUMNS
+          from {{ relation.database }}.INFORMATION_SCHEMA.COLUMNS
           where table_name = '{{ relation.identifier }}'
             and table_schema = '{{ relation.schema }}'
           UNION ALL
