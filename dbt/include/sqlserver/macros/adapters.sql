@@ -50,23 +50,55 @@
   {% endcall %}
 {% endmacro %}
 
-{% macro sqlserver__drop_schema(database_name, schema_name) -%}
+{% macro sqlserver__drop_schema(relation) -%}
+  {%- set tables_in_schema_query %}
+      SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = '{{ relation.schema }}'
+  {% endset %}
+  {% set tables_to_drop = run_query(tables_in_schema_query).columns[0].values() %}
+  {% for table in tables_to_drop %}
+    {%- set schema_relation = adapter.get_relation(database=relation.database,
+                                               schema=relation.schema,
+                                               identifier=table) -%}
+    {% do drop_relation(schema_relation) %}
+  {%- endfor %}
+
   {% call statement('drop_schema') -%}
-    drop schema if exists {{ relation.without_identifier().schema }}
-  {% endcall %}
+      IF EXISTS (SELECT * FROM sys.schemas WHERE name = '{{ relation.schema }}')
+      BEGIN
+      EXEC('DROP SCHEMA {{ relation.schema }}')
+      END  {% endcall %}
 {% endmacro %}
 
 {% macro sqlserver__drop_relation(relation) -%}
+  {% if relation.type == 'view' -%}
+   {% set object_id_type = 'V' %}
+   {% elif relation.type == 'table'%}
+   {% set object_id_type = 'U' %}
+   {%- else -%} invalid target name
+   {% endif %}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation.schema }}.{{ relation.identifier }}
+    if object_id ('{{ relation.include(database=False) }}','{{ object_id_type }}') is not null
+      begin
+      drop {{ relation.type }} {{ relation.include(database=False) }}
+      end
   {%- endcall %}
 {% endmacro %}
 
 {% macro sqlserver__drop_relation_script(relation) -%}
-    drop {{ relation.type }} if exists {{ relation.schema }}.{{ relation.identifier }}
+  {% if relation.type == 'view' -%}
+   {% set object_id_type = 'V' %}
+   {% elif relation.type == 'table'%}
+   {% set object_id_type = 'U' %}
+   {%- else -%} invalid target name
+   {% endif %}
+  if object_id ('{{ relation.include(database=False) }}','{{ object_id_type }}') is not null
+      begin
+      drop {{ relation.type }} {{ relation.include(database=False) }}
+      end
 {% endmacro %}
 
-{% macro sqlserver__check_schema_exists(database, schema) -%}
+{% macro sqlserver__check_schema_exists(information_schema, schema) -%}
   {% call statement('check_schema_exists', fetch_result=True, auto_begin=False) -%}
     --USE {{ database_name }}
     SELECT count(*) as schema_exist FROM sys.schemas WHERE name = '{{ schema }}'
@@ -95,7 +127,12 @@
   {%- set cci_name = relation.schema ~ '_' ~ relation.identifier ~ '_cci' -%}
   {%- set relation_name = relation.schema ~ '_' ~ relation.identifier -%}
   {%- set full_relation = relation.schema ~ '.' ~ relation.identifier -%}
-  DROP INDEX IF EXISTS {{relation_name}}.{{cci_name}}
+  if EXISTS (
+        SELECT * FROM
+        sys.indexes WHERE name = '{{cci_name}}'
+        AND object_id=object_id('{{relation_name}}')
+    )
+  DROP index {{full_relation}}.{{cci_name}}
   CREATE CLUSTERED COLUMNSTORE INDEX {{cci_name}}
     ON {{full_relation}}
 {% endmacro %}
@@ -160,8 +197,8 @@
           UNION ALL
           select
               ordinal_position,
-              column_name,
-              data_type,
+              column_name collate database_default,
+              data_type collate database_default,
               character_maximum_length,
               numeric_precision,
               numeric_scale
